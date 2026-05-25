@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NYC Community Organizations Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1a1a2e;
+      --paper: #f4efe6;
+      --accent: #c8412a;
+      --accent2: #2a6496;
+      --muted: #7a7265;
+      --card: #fffbf5;
+      --border: #ddd4c0;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); }
+
+    header {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 22px 36px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 4px solid var(--accent);
+    }
+    header h1 { font-family: 'DM Serif Display', serif; font-size: 1.9rem; line-height: 1.1; }
+    header h1 em { font-style: italic; color: #e8c49a; }
+    header .sub { font-size: 0.78rem; font-weight: 300; color: #9090b0; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 4px; }
+    .badge { margin-left: auto; background: var(--accent); color: #fff; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 6px 14px; border-radius: 2px; white-space: nowrap; }
+
+    .layout { display: flex; height: calc(100vh - 88px); overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar { width: 360px; min-width: 260px; background: var(--card); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+    .sidebar-top { background: var(--ink); padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+    .sidebar-top input {
+      width: 100%; padding: 9px 13px;
+      background: #272748; border: 1px solid #3a3a60; border-radius: 3px;
+      color: #eee; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none;
+    }
+    .sidebar-top input::placeholder { color: #6a6a9a; }
+    .sidebar-top input:focus { border-color: var(--accent); }
+    .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fbtn {
+      padding: 4px 11px; border-radius: 20px; border: 1px solid #3a3a60;
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+      color: #9090c0; background: transparent; cursor: pointer; transition: all .18s;
+    }
+    .fbtn:hover, .fbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .count-bar { padding: 7px 16px; font-size: 0.72rem; color: var(--muted); border-bottom: 1px solid var(--border); background: #f9f4ec; }
+    .org-list { flex: 1; overflow-y: auto; }
+    .org-list::-webkit-scrollbar { width: 3px; }
+    .org-list::-webkit-scrollbar-thumb { background: var(--border); }
+    .org-item { display: flex; align-items: flex-start; gap: 11px; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s; }
+    .org-item:hover { background: #ede6da; }
+    .org-item.active { background: #f0e0d0; border-left: 3px solid var(--accent); }
+    .num { min-width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.66rem; font-weight: 700; color: #fff; flex-shrink: 0; margin-top: 1px; }
+    .num.brooklyn  { background: #c8412a; }
+    .num.bronx     { background: #8b4513; }
+    .num.manhattan { background: #2a6496; }
+    .num.queens    { background: #6a4c93; }
+    .oname { font-size: 0.86rem; font-weight: 600; line-height: 1.3; }
+    .oaddr { font-size: 0.74rem; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
+    .btag { display: inline-block; font-size: 0.63rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; margin-top: 4px; }
+    .btag.brooklyn  { background: #fce8e5; color: #c8412a; }
+    .btag.bronx     { background: #f5ece3; color: #8b4513; }
+    .btag.manhattan { background: #e5eef5; color: #2a6496; }
+    .btag.queens    { background: #eee8f5; color: #6a4c93; }
+
+    /* Map pane */
+    .map-pane { flex: 1; position: relative; overflow: hidden; }
+    #mapFrame { width: 100%; height: 100%; border: none; }
+
+    /* Detail card */
+    .detail-card {
+      position: absolute; top: 14px; right: 14px; width: 270px;
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 4px; padding: 16px 16px 14px; box-shadow: 0 6px 24px rgba(0,0,0,.13);
+      display: none; z-index: 20; animation: fadeUp .2s ease;
+    }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    .detail-card.show { display: block; }
+    .detail-card .x { position: absolute; top: 8px; right: 11px; background: none; border: none; font-size: 1.3rem; cursor: pointer; color: var(--muted); line-height:1; }
+    .detail-card .x:hover { color: var(--accent); }
+    .detail-card h3 { font-family: 'DM Serif Display', serif; font-size: 1rem; line-height: 1.3; padding-right: 18px; margin-top: 6px; }
+    .detail-card p  { font-size: 0.78rem; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+    .detail-card a  { display:inline-block; margin-top: 10px; font-size: 0.76rem; font-weight: 600; color: var(--accent2); text-decoration: none; border-bottom: 1px solid currentColor; }
+    .detail-card a:hover { color: var(--accent); }
+
+    /* Legend */
+    .legend { position: absolute; bottom: 20px; right: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 10px 14px; font-size: 0.72rem; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .leg-title { font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-size: 0.63rem; margin-bottom: 6px; }
+    .leg-row { display:flex; align-items:center; gap:7px; margin-bottom:4px; }
+    .leg-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+
+    /* Prompt overlay shown when no org is selected */
+    .map-prompt {
+      position: absolute; bottom: 20px; left: 14px;
+      background: rgba(26,26,46,0.82); color: #ddd8f0;
+      font-size: 0.75rem; padding: 8px 14px; border-radius: 3px;
+      pointer-events: none; letter-spacing: 0.03em;
+      backdrop-filter: blur(4px);
+    }
+
+    @media (max-width: 680px) {
+      .layout { flex-direction: column; height: auto; }
+      .sidebar { width: 100%; height: 44vh; min-width: unset; }
+      .map-pane { height: 56vh; }
+      header { padding: 16px 20px; }
+      header h1 { font-size: 1.3rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>NYC <em>Community</em> Organizations</h1>
+    <div class="sub">Service Network · Five Boroughs</div>
+  </div>
+  <div class="badge">20 Locations</div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <input type="text" id="searchBox" placeholder="Search by name or address…" oninput="doSearch()">
+      <div class="filters">
+        <button class="fbtn on" onclick="setBorough('all',this)">All</button>
+        <button class="fbtn" onclick="setBorough('brooklyn',this)">Brooklyn</button>
+        <button class="fbtn" onclick="setBorough('bronx',this)">Bronx</button>
+        <button class="fbtn" onclick="setBorough('manhattan',this)">Manhattan</button>
+        <button class="fbtn" onclick="setBorough('queens',this)">Queens</button>
+      </div>
+    </div>
+    <div class="count-bar" id="countBar">Showing 20 locations</div>
+    <div class="org-list" id="orgList"></div>
+  </aside>
+
+  <div class="map-pane">
+    <iframe id="mapFrame" allowfullscreen loading="lazy"
+      referrerpolicy="no-referrer-when-downgrade"
+      src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d193595.15830869428!2d-74.11976397050642!3d40.69766374865766!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c24fa5d33f083b%3A0xc80b8f06e177fe62!2sNew%20York%2C%20NY!5e0!3m2!1sen!2sus!4v1715000000000!5m2!1sen!2sus">
+    </iframe>
+
+    <div class="detail-card" id="detailCard">
+      <button class="x" onclick="closeCard()">×</button>
+      <div class="btag" id="dc-boro"></div>
+      <h3 id="dc-name"></h3>
+      <p id="dc-addr"></p>
+      <a id="dc-link" href="#" target="_blank" rel="noopener">Open in Google Maps ↗</a>
+    </div>
+
+    <div class="legend">
+      <div class="leg-title">Borough</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#c8412a"></div>Brooklyn</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#8b4513"></div>Bronx</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#2a6496"></div>Manhattan</div>
+      <div class="leg-row"><div class="leg-dot" style="background:#6a4c93"></div>Queens</div>
+    </div>
+
+    <div class="map-prompt" id="mapPrompt">← Click an organization to zoom in</div>
+  </div>
+</div>
+
+<script>
+const ORGS = [
+  { id:"1",  name:"Cypress Hills Local Development Corporation",           addr:"625 Jamaica Ave, Brooklyn, NY 11208",              boro:"brooklyn"  },
+  { id:"2",  name:"Montefiore Medical Center",                             addr:"111 E 210th St, Bronx, NY 10467",                  boro:"bronx"     },
+  { id:"3",  name:"Sunnyside Community Services",                          addr:"43-31 39th Street, Sunnyside, NY 11104",           boro:"queens"    },
+  { id:"4",  name:"Queens Community House, Inc.",                          addr:"108-69 62nd Drive, Queens, NY 11375",              boro:"queens"    },
+  { id:"5",  name:"AID FOR LIFE",                                          addr:"131 Varick St Suite 1006, New York, NY 10013",     boro:"manhattan" },
+  { id:"6a", name:"Mercy Center Bronx (Location 1)",                       addr:"377 E 145th St, Bronx, NY 10454",                  boro:"bronx"     },
+  { id:"6b", name:"Mercy Center Bronx (Location 2)",                       addr:"332 E 149th St 8th Floor, Bronx, NY 10451",        boro:"bronx"     },
+  { id:"7",  name:"Shorefront YM-YWHA of Brighton-Manhattan Beach",        addr:"3300 Coney Island Ave, Brooklyn, NY 11235",        boro:"brooklyn"  },
+  { id:"8",  name:"Muslim Community Network",                              addr:"450 Lexington Ave, New York, NY 10163",            boro:"manhattan" },
+  { id:"9",  name:"Hebrew Educational Society of Brooklyn",                addr:"9502 Seaview Ave, Brooklyn, NY 11236",             boro:"brooklyn"  },
+  { id:"10", name:"Mixteca Organization Inc.",                             addr:"245 23rd St #2, Brooklyn, NY 11215",               boro:"brooklyn"  },
+  { id:"11", name:"Edith & Carl Marks JCH of Bensonhurst",                addr:"7802 Bay Pkwy, Brooklyn, NY 11214",                boro:"brooklyn"  },
+  { id:"12", name:"Educational Alliance",                                  addr:"197 East Broadway, New York, NY 10002",            boro:"manhattan" },
+  { id:"13", name:"Riseboro Community Partnership",                        addr:"565 Bushwick Ave, Brooklyn, NY 11206",             boro:"brooklyn"  },
+  { id:"14", name:"Mexican Coalition for Empowerment of Youth & Families", addr:"389 E 150th St, Bronx, NY 10455",                  boro:"bronx"     },
+  { id:"15", name:"Parent-Child Relationship Association",                 addr:"947 57th St, Brooklyn, NY 11219",                  boro:"brooklyn"  },
+  { id:"16", name:"Mosholu-Montefiore Community Center (MMCC)",            addr:"3450 Dekalb Ave, Bronx, NY 10467",                 boro:"bronx"     },
+  { id:"17", name:"Center for Family Life in Sunset Park",                 addr:"443 39th St, Brooklyn, NY 11232",                  boro:"brooklyn"  },
+  { id:"18", name:"Greenwich House",                                       addr:"623 Broadway 3rd Floor, New York, NY 10014",       boro:"manhattan" },
+  { id:"19", name:"Make the Road New York",                                addr:"301 Grove Street, Brooklyn, NY 11237",             boro:"brooklyn"  },
+];
+
+const LABELS = { brooklyn:"Brooklyn", bronx:"Bronx", manhattan:"Manhattan", queens:"Queens" };
+let currentBorough = 'all', currentSearch = '';
+
+function renderList() {
+  const list = document.getElementById('orgList');
+  list.innerHTML = '';
+  let count = 0;
+  ORGS.forEach(org => {
+    const matchB = currentBorough === 'all' || org.boro === currentBorough;
+    const q = currentSearch.toLowerCase();
+    const matchS = !q || org.name.toLowerCase().includes(q) || org.addr.toLowerCase().includes(q);
+    if (!matchB || !matchS) return;
+    count++;
+    const el = document.createElement('div');
+    el.className = 'org-item';
+    el.innerHTML = `
+      <div class="num ${org.boro}">${org.id}</div>
+      <div style="flex:1;min-width:0">
+        <div class="oname">${org.name}</div>
+        <div class="oaddr">${org.addr}</div>
+        <span class="btag ${org.boro}">${LABELS[org.boro]}</span>
+      </div>`;
+    el.addEventListener('click', () => selectOrg(org, el));
+    list.appendChild(el);
+  });
+  document.getElementById('countBar').textContent = `Showing ${count} location${count!==1?'s':''}`;
+}
+
+function setBorough(b, btn) {
+  currentBorough = b;
+  document.querySelectorAll('.fbtn').forEach(x => x.classList.remove('on'));
+  btn.classList.add('on');
+  renderList();
+}
+
+function doSearch() {
+  currentSearch = document.getElementById('searchBox').value;
+  renderList();
+}
+
+function selectOrg(org, el) {
+  document.querySelectorAll('.org-item').forEach(x => x.classList.remove('active'));
+  el.classList.add('active');
+
+  // Update map to show this address
+  const q = encodeURIComponent(org.addr);
+  document.getElementById('mapFrame').src =
+    `https://maps.google.com/maps?q=${q}&z=15&output=embed`;
+
+  // Detail card
+  const boroEl = document.getElementById('dc-boro');
+  boroEl.textContent = LABELS[org.boro];
+  boroEl.className = `btag ${org.boro}`;
+  document.getElementById('dc-name').textContent = org.name;
+  document.getElementById('dc-addr').textContent = org.addr;
+  document.getElementById('dc-link').href =
+    `https://www.google.com/maps/search/?api=1&query=${q}`;
+  document.getElementById('detailCard').classList.add('show');
+  document.getElementById('mapPrompt').style.display = 'none';
+}
+
+function closeCard() {
+  document.getElementById('detailCard').classList.remove('show');
+  document.querySelectorAll('.org-item').forEach(x => x.classList.remove('active'));
+  document.getElementById('mapFrame').src =
+    `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d193595.15830869428!2d-74.11976397050642!3d40.69766374865766!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x89c24fa5d33f083b%3A0xc80b8f06e177fe62!2sNew%20York%2C%20NY!5e0!3m2!1sen!2sus!4v1715000000000!5m2!1sen!2sus`;
+  document.getElementById('mapPrompt').style.display = '';
+}
+
+renderList();
+</script>
+</body>
+</html>
